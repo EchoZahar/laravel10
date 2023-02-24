@@ -56,7 +56,23 @@ return [
             'throw' => false,
         ],
 
+        'portal' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/portal/'),
+            'url' => env('APP_URL').'/storage',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
+        'portal_ftp' => [
+            'driver'    => 'ftp',
+            'host'      => env('FTP_PORTAL_HOST'),
+            'username'  => env('FTP_PORTAL_USER'),
+            'password'  => env('FTP_PORTAL_PASSWORD'),
+        ],
+
     ],
+
 
     /*
     |--------------------------------------------------------------------------

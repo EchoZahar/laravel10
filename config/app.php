@@ -1,5 +1,6 @@
 <?php
 
+use App\Providers\AliexpressServiceProvider;
 use App\Providers\PortalServiceProvider;
 use Illuminate\Support\Facades\Facade;
 
@@ -197,6 +198,7 @@ return [
         App\Providers\RouteServiceProvider::class,
 
         PortalServiceProvider::class,
+        AliexpressServiceProvider::class,
 
     ],
 

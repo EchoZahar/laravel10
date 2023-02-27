@@ -65,6 +65,13 @@ class PortalFtpData extends Command
             $this->comment('Check stocks: ' . $startWh->diff(now())->format('%i min, %s sec'));
         }
 
+        if (count(glob(storage_path('app/public/portal/unzip/') . 'categories.*')) > 0) {
+            $startCat = now();
+            $data->checkCategoriesData(glob(storage_path('app/public/portal/unzip/') . 'categories.json'));
+            $this->newLine();
+            $this->comment('Check categories: ' . $startCat->diff(now())->format('%i min, %s sec'));
+        }
+
         $this->output->writeln($this->description . ' End');
     }
 }

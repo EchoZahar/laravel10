@@ -29,9 +29,9 @@ class PortalDataProcessing implements PortalFTPContract
         }
     }
 
-    public function rewriteIncomingData()
-    {
-        // TODO: Распарсить данные.
-
-    }
+//    public function rewriteIncomingData()
+//    {
+//        // TODO: Распарсить данные.
+//
+//    }
 }

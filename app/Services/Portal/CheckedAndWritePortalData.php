@@ -2,9 +2,11 @@
 
 namespace App\Services\Portal;
 
+use App\Models\PortalCategory;
 use App\Models\PortalNomenclature;
 use App\Models\PortalStock;
 use App\Models\PortalWarehouse;
+use Illuminate\Support\Str;
 
 class CheckedAndWritePortalData
 {
@@ -12,11 +14,6 @@ class CheckedAndWritePortalData
     {
         $data = json_decode(file_get_contents($data));
         $this->prepareNomenclaturesData($data->nomenclatures);
-    }
-
-    public function checkCategoriesData()
-    {
-
     }
 
     public function checkStocksData($data) : void
@@ -119,6 +116,30 @@ class CheckedAndWritePortalData
         if (count($prepareData) > 0) {
             foreach (collect($prepareData)->chunk(1000) as $chunk) {
                 PortalStock::query()->insert($chunk->toArray());
+            }
+        }
+    }
+
+
+    public function checkCategoriesData($portalCategories): void
+    {
+        $data = json_decode(file_get_contents($portalCategories[0]));
+        $portalCategories = [];
+        if (count($data->categories) > 0) {
+            PortalCategory::query()->truncate();
+            foreach ($data->categories as $category) {
+                if (!is_null($category->ozon_type_id) and !is_null($category->ozon_type_name)) {
+                    $portalCategories[] = [
+                        'nomenclature_type_id'      => (int)$category->nomenclature_type_id,
+                        'parent_id'                 => (int)$category->parent_id,
+                        'type_name'                 => $category->type_name,
+                        'ozon_type_id'              => (int)$category->ozon_type_id,
+                        'ozon_type_name'            => $category->ozon_type_name,
+                    ];
+                }
+            }
+            foreach (collect($portalCategories)->chunk(1000) as $chunk) {
+                PortalCategory::query()->insert($chunk->toArray());
             }
         }
     }

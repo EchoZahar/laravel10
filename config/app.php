@@ -1,6 +1,7 @@
 <?php
 
 use App\Providers\AliexpressServiceProvider;
+use App\Providers\OzonServiceProvider;
 use App\Providers\PortalServiceProvider;
 use Illuminate\Support\Facades\Facade;
 
@@ -199,6 +200,7 @@ return [
 
         PortalServiceProvider::class,
         AliexpressServiceProvider::class,
+        OzonServiceProvider::class
 
     ],
 

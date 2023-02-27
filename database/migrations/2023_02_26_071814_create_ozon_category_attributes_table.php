@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('ozon_category_attributes', function (Blueprint $table) {
             $table->id();
-            $table->integer('ozon_category_id');
+            $table->foreignId('ozon_category_id')->index()->constrained();
             $table->bigInteger('source_id')->comment('id атрибута на мп');
             $table->string('name')->comment('наименование атрибута');
             $table->text('description')->nullable()->comment('описание атрибута');

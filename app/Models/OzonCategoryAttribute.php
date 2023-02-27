@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OzonCategoryAttribute extends Model
 {
@@ -26,8 +25,12 @@ class OzonCategoryAttribute extends Model
         return $this->belongsTo(OzonCategory::class);
     }
 
-    public function ozonCategoryAttributeValues() : HasMany
+    /**
+     * Получить attribute values при загрузке.
+     * @return mixed
+     */
+    public function scopeAttributeValues() : mixed
     {
-        return $this->hasMany(OzonCategoryAttributeValue::class);
+        return OzonCategoryAttributeValue::where('ozon_attribute_source_id', '=', $this->source_id)->get();
     }
 }

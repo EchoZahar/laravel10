@@ -13,13 +13,11 @@ return new class extends Migration
     {
         Schema::create('ozon_category_attribute_values', function (Blueprint $table) {
             $table->id();
-            $table->integer('source_attribute_id')->nullable();
+            $table->integer('ozon_attribute_source_id')->nullable();
             $table->bigInteger('source_id');
             $table->text('value');
             $table->text('info')->nullable();
             $table->string('picture')->nullable();
-//            $table->timestamps();
-//            $table->foreign('ozon_category_attribute_id', 'ozon_category_attribute_id')->references('id')->on('ozon_category_attributes');
         });
     }
 

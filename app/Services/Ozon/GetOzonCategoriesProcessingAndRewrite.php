@@ -7,7 +7,6 @@ use App\Models\OzonCategory;
 use App\Models\OzonCategoryAttribute;
 use App\Models\OzonCategoryAttributeValue;
 use App\Services\Ozon\Methods\OzonCategoriesAndAttributeMethods;
-use Illuminate\Support\Facades\Log;
 
 class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
 {
@@ -16,10 +15,7 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
     public function findNecessaryParentOzonCategory()
     {
         $parentOzonCategories = $this->methods->getOzonCategoryTree();
-        // truncate table 'ozon_category_attributes' and rewrite data.
-        if (count($parentOzonCategories->result) > 0) OzonCategoryAttribute::query()->truncate();
         $this->searchInParentCategories($parentOzonCategories);
-        $this->checkAttributeValues();
     }
 
     /**
@@ -28,8 +24,9 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
      */
     private function searchInParentCategories($parentCategories)
     {
+        OzonCategoryAttributeValue::query()->truncate();
         foreach ($parentCategories->result as $category) {
-            if (stristr($category->title, 'Авто')) {
+            if (stristr($category->title, 'Автот')) {
                 if (count($category->children) > 0) {
                     $this->checkChildrenCategories($category->children);
                 }
@@ -65,6 +62,7 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
     private function checkCategoryAttributes($ozonCategory)
     {
         $attributeList = $this->methods->getListCategoryAttribute($ozonCategory->source_id, "ALL", "DEFAULT");
+
         if (count($attributeList->result[0]->attributes) > 0) {
             $this->saveCategoryAttributes($ozonCategory, $attributeList->result[0]->attributes);
         }
@@ -74,9 +72,10 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
     {
         $data = [];
         foreach ($attributes as $attribute) {
-            $data[] = [
-                'source_id'             => $attribute->id,
+            $data[] = OzonCategoryAttribute::query()->updateOrCreate([
                 'ozon_category_id'      => $ozonCategory->id,
+                'source_id'             => $attribute->id,
+            ], [
                 'name'                  => $attribute->name,
                 'description'           => $attribute->description,
                 'type'                  => $attribute->type,
@@ -87,39 +86,36 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
                 'dictionary_id'         => $attribute->dictionary_id,
                 'is_aspect'             => $attribute->is_aspect,
                 'category_dependent'    => $attribute->category_dependent,
-            ];
+            ]);
         }
-        OzonCategoryAttribute::query()->insert($data);
+        if (count($data) > 0) {
+            $this->checkAttributeValues($data);
+        }
     }
 
-    private function checkAttributeValues()
+    private function checkAttributeValues($attributes)
     {
-        $data = OzonCategoryAttribute::query()->with('ozonCategory')
-            ->where('dictionary_id', '>', 0)
-            ->select('id', 'ozon_category_id', 'source_id')
-            ->get()
-            ->unique('source_id');
-        if ($data) {
-            foreach ($data as $item) {
-                Log::info('item: ozon source category id: ' . $item->ozonCategory->source_id . ', attribute source id' . $item->source_id);
-                $values = $this->methods->getListCategoryAttributeValues($item->ozonCategory->source_id, $item->source_id);
-                Log::info('Ozon response: ' . json_encode($values->result, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE) . PHP_EOL . __METHOD__);
-                $this->saveAttributeValues($item->source_id, $values);
+        foreach ($attributes as $attribute) {
+            if ($attribute->dictionary_id > 0) {
+                if (is_null(OzonCategoryAttributeValue::where('ozon_attribute_source_id', '=', $attribute->source_id)->first())) {
+                    $values = $this->methods->getListCategoryAttributeValues($attribute->ozonCategory->source_id, $attribute->source_id);
+                    $this->saveAttributeValues($attribute->source_id, $values);
+                }
             }
         }
     }
 
-    private function saveAttributeValues($attributeID, $values)
+    private function saveAttributeValues($attributeSourceID, $values)
     {
         if (count($values->result) > 0) {
             $data = [];
             foreach ($values->result as $value) {
                 $data[] = [
-                    'source_attribute_id'    => $attributeID,
-                    'source_id'	             => $value->id,
-                    'value'	                 => $value->value,
-                    'info'                   => $value->info,
-                    'picture'                => $value->picture,
+                    'ozon_attribute_source_id'  => $attributeSourceID,
+                    'source_id'	                => $value->id,
+                    'value'	                    => $value->value,
+                    'info'                      => $value->info,
+                    'picture'                   => $value->picture,
                 ];
             }
             foreach (collect($data)->chunk(1000) as $chunk) {

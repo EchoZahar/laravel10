@@ -1,7 +1,8 @@
 <?php
 
-use App\Models\AliexpressCategory;
+use App\Models\AliCategory;
 use App\Models\OzonCategory;
+use App\Models\PortalCategory;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -18,8 +19,9 @@ return new class extends Migration
             $table->unsignedBigInteger('parent_id')->nullable();
             $table->string('name')->unique();
             $table->string('slug');
+            $table->foreignIdFor(PortalCategory::class)->nullable();
             $table->foreignIdFor(OzonCategory::class)->nullable();
-            $table->foreignIdFor(AliexpressCategory::class)->nullable();
+            $table->foreignIdFor(AliCategory::class)->nullable();
             $table->timestamps();
         });
     }

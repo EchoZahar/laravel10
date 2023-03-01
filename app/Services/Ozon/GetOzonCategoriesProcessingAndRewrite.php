@@ -7,6 +7,7 @@ use App\Models\OzonCategory;
 use App\Models\OzonCategoryAttribute;
 use App\Models\OzonCategoryAttributeValue;
 use App\Services\Ozon\Methods\OzonCategoriesAndAttributeMethods;
+use Illuminate\Database\Eloquent\Model;
 
 class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
 {
@@ -27,53 +28,84 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
         OzonCategoryAttributeValue::query()->truncate();
         foreach ($parentCategories->result as $category) {
             if (stristr($category->title, 'Автот')) {
-                if (count($category->children) > 0) {
-                    $this->checkChildrenCategories($category->children);
-                }
-                else {
-                    $this->saveCategory($category);
-                }
+                $this->parseCategoryData($category);
             }
         }
     }
 
-    private function checkChildrenCategories($childrenCategories)
+    /**
+     * Проверка вложенных категории.
+     *
+     * @param $category
+     * @return void
+     */
+    private function parseCategoryData($category) : void
     {
-        foreach ($childrenCategories  as $category) {
+        $localCategory = $this->saveCategory($category);
+        if (count($category->children) > 0) {
+            $this->checkChildrenCategories($category->children, $localCategory->id);
+        }
+    }
+
+    private function checkChildrenCategories($childrenCategories, $parentCategoryId) : void
+    {
+        foreach ($childrenCategories as $category) {
+            $savedCategory = $this->saveCategory($category, $parentCategoryId);
             if (count($category->children) > 0) {
-                $this->checkChildrenCategories($category->children);
+                $this->checkChildrenCategories($category->children, $savedCategory->id);
             }
             else {
-                $this->saveCategory($category);
+                $this->checkCategoryAttributes($savedCategory);
             }
         }
     }
 
-    private function saveCategory($category)
+    /**
+     * Сохранить категорию и вернуть сохраненные данные.
+     *
+     * @param $category
+     * @param $parentCategory
+     * @return Model
+     */
+    private function saveCategory($category, $parentCategory = null) : Model
     {
-        $ozonCategory = OzonCategory::query()->updateOrCreate([
+        return OzonCategory::query()->updateOrCreate([
             'source_id' => $category->category_id
         ], [
-            'name' => $category->title,
+            'parent_id' => (!$parentCategory) ? null : $parentCategory,
+            'name'      => $category->title,
         ]);
-        $this->checkCategoryAttributes($ozonCategory);
     }
 
-    private function checkCategoryAttributes($ozonCategory)
+
+    /**
+     * Получить атрибуты категории.
+     * @param $savedCategory
+     * @return void
+     */
+    private function checkCategoryAttributes($savedCategory) : void
     {
-        $attributeList = $this->methods->getListCategoryAttribute($ozonCategory->source_id, "ALL", "DEFAULT");
+
+        $attributeList = $this->methods->getListCategoryAttribute($savedCategory->source_id, "ALL", "DEFAULT");
 
         if (count($attributeList->result[0]->attributes) > 0) {
-            $this->saveCategoryAttributes($ozonCategory, $attributeList->result[0]->attributes);
+            $this->saveCategoryAttributes($savedCategory, $attributeList->result[0]->attributes);
         }
     }
 
-    private function saveCategoryAttributes(OzonCategory $ozonCategory, $attributes)
+    /**
+     * Сохранение атрибутов категории.
+     *
+     * @param OzonCategory $savedCategory
+     * @param $attributes
+     * @return void
+     */
+    private function saveCategoryAttributes(OzonCategory $savedCategory, $attributes) : void
     {
         $data = [];
         foreach ($attributes as $attribute) {
             $data[] = OzonCategoryAttribute::query()->updateOrCreate([
-                'ozon_category_id'      => $ozonCategory->id,
+                'ozon_category_id'      => $savedCategory->id,
                 'source_id'             => $attribute->id,
             ], [
                 'name'                  => $attribute->name,
@@ -93,7 +125,13 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
         }
     }
 
-    private function checkAttributeValues($attributes)
+    /**
+     * Проверить подготовленное значение атрибута.
+     *
+     * @param $attributes
+     * @return void
+     */
+    private function checkAttributeValues($attributes) : void
     {
         foreach ($attributes as $attribute) {
             if ($attribute->dictionary_id > 0) {
@@ -105,7 +143,14 @@ class GetOzonCategoriesProcessingAndRewrite implements SyncOzonCategories
         }
     }
 
-    private function saveAttributeValues($attributeSourceID, $values)
+    /**
+     * Сохранение значений атрибутов.
+     *
+     * @param $attributeSourceID
+     * @param $values
+     * @return void
+     */
+    private function saveAttributeValues($attributeSourceID, $values) : void
     {
         if (count($values->result) > 0) {
             $data = [];

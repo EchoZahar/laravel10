@@ -11,11 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('ali_category_attribute_values', function (Blueprint $table) {
-            $table->id();
-            $table->bigInteger('ali_attribute_id')->nullable();
-            $table->json('values')->nullable();
-            $table->json('error')->nullable();
+        Schema::create('ali_category_ali_category_attribute', function (Blueprint $table) {
+            $table->bigInteger('ali_category_id');
+            $table->bigInteger('ali_category_attribute_id');
+            $table->primary(['ali_category_id', 'ali_category_attribute_id']);
         });
     }
 
@@ -24,6 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('ali_category_attribute_values');
+        Schema::dropIfExists('ali_category_ali_category_attribute');
     }
 };

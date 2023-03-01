@@ -3,72 +3,95 @@
 namespace App\Services\Aliexpress;
 
 use App\Contracts\Aliexpress\SyncAliexpressCategories;
-use App\Models\AliexpressCategory;
-use App\Models\AliexpressCategoryAttribute;
-use App\Models\AliexpressCategoryAttributeValue;
+use App\Models\AliCategory;
+use App\Models\AliCategoryAttribute;
+use App\Models\AliCategoryAttributeValue;
 use App\Services\Aliexpress\Methods\AliexpressCategoryMethods;
 
 class AliexpressSyncCategoriesService implements SyncAliexpressCategories
 {
     public function __construct(protected AliexpressCategoryMethods $method) {}
-    public function getParentsCategoriesAndSynchronization()
+
+    public function getParentsCategoriesAndSynchronization() : void
     {
         $parentCategories = $this->method->getParentCategories();
-        foreach ($parentCategories->categories as $category) {
-            if (stristr($category->name, 'Авто')) {
-                if (count($category->children_ids) > 0) {
-                    $this->checkChildrenCategories($this->method->getChildrenCategories($category->children_ids));
+        if (isset($parentCategories->categories)) {
+            foreach ($parentCategories->categories as $category) {
+                if (stristr($category->name, 'Авто')) {
+                    $this->getCategoryTree($category);
                 }
             }
         }
     }
 
-    private function checkChildrenCategories($childrenCategories)
+    private function getCategoryTree($category, $parentID = null) : void
     {
-        foreach ($childrenCategories->categories as $category) {
-            if (count($category->children_ids) > 0) {
-                foreach (collect($category->children_ids)->chunk(20) as $chunk) {
-                    $response = $this->method->getChildrenCategories($chunk->toArray());
-                    if (count($response->categories) > 0) {
-                        $this->checkChildrenCategories($response);
-                    }
-                }
-            }
-            else {
-                $this->saveCategory($category);
-            }
-        }
-    }
+        $localCategory = $this->saveCategory($category, $parentID);
 
-    private function saveCategory($category)
-    {
-        $localCategory = AliexpressCategory::updateOrCreate([
-            'source_id' => (int)$category->id,
-        ], [
-            'name'          => $category->name,
-            'is_visible'    => (bool)$category->is_visible,
-        ]);
+        if (count($category->children_ids) > 0) {
+            $this->checkChildrenCategories($category->children_ids, $localCategory->id);
+        }
+
         if (count($category->sku_properties) > 0) {
             $this->checkAttribute($category->sku_properties, $localCategory, true);
         }
-        else if (count($category->properties) > 0) {
+
+        if (count($category->properties) > 0) {
             $this->checkAttribute($category->properties, $localCategory, false);
         }
+
     }
 
-    private function checkAttribute($attributes, $category, bool $isSku)
+    private function checkChildrenCategories($childrenCategories, $parentID = null)
     {
-        foreach ($attributes as $attribute) {
-            $this->saveAttribute($attribute, $category, $isSku);
+        $data = [];
+        foreach (collect($childrenCategories)->chunk(20) as $chunk) {
+            $response = $this->method->getChildrenCategories($chunk->toArray());
+            if (count($response->categories) > 0) {
+                foreach ($response->categories as $category) {
+                    $data[] = $category;
+                }
+            }
+        }
+        foreach ($data as $category) {
+            $this->getCategoryTree($category, $parentID);
         }
     }
 
-    private function saveAttribute($attribute, $category, $isSku)
+
+    private function saveCategory($category, $parentID = null)
     {
-        $localAttribute = AliexpressCategoryAttribute::updateOrCreate([
-            'source_id' => (int)$attribute->id,
+
+        if (isset($category->is_visible)) {
+            $is_visible = $category->is_visible;
+        }
+        else {
+            $is_visible = false;
+        }
+
+        return AliCategory::updateOrCreate([
+            'source_id' => (int)$category->id,
         ], [
-            'aliexpress_category_id'    => $category->id,
+            'parent_id'     => $parentID,
+            'name'          => $category->name,
+            'is_visible'    => $is_visible,
+        ]);
+    }
+
+    private function checkAttribute($attributes, $localCategory, bool $isSku)
+    {
+        foreach ($attributes as $attribute) {
+            $this->saveAttribute($attribute, $localCategory, $isSku);
+        }
+
+//        $this->checkAttributeValues($localCategory->source_id, $data, $isSku);
+    }
+
+    private function saveAttribute($attribute, $localCategory, $isSku) : void
+    {
+        $localAttribute = AliCategoryAttribute::updateOrCreate([
+            'source_id'         => (int)$attribute->id,
+        ], [
             'is_sku'                    => $isSku,
             'name'                      => $attribute->name,
             'is_required'               => $attribute->is_required,
@@ -83,19 +106,28 @@ class AliexpressSyncCategoriesService implements SyncAliexpressCategories
             'units'                     => $attribute->units,
         ]);
 
-        $this->checkAttributeValue($category, $localAttribute, $isSku);
+        $localAttribute->aliCategories()->sync($localCategory->id);
+
+//        return $localAttribute;
+
+//        $this->checkAttributeValue($localCategory, $localAttribute, $isSku);
     }
 
-    private function checkAttributeValue($category, $attribute, $isSku)
+    private function checkAttributeValues($aliexpressCategoryID, $localAttributes, $isSku) : void
     {
-        $response = $this->method->getCategoryAttributeValue($category->source_id, $attribute->source_id, $isSku);
-        if (count($response->values) > 0) {
-            AliexpressCategoryAttributeValue::updateOrCreate([
-                'attribute_id' => $attribute->id,
-            ], [
-                'values'    => $response->values,
-                'error'     => $response->error,
-            ]);
+        foreach ($localAttributes as $attribute) {
+            $response = $this->method->getCategoryAttributeValue($aliexpressCategoryID, $attribute->source_id, $isSku);
+            if (count($response->values) > 0) {
+                if  (is_null(AliCategoryAttributeValue::query()->where('ali_attribute_id', '=', $attribute->id)->first())) {
+                    $attributeValue = AliCategoryAttributeValue::query()->updateOrCreate([
+                        'ali_attribute_id' => $attribute->id,
+                    ], [
+                        'values'    => $response->values,
+                        'error'     => $response->error,
+                    ]);
+                    $attribute->aliAttributeValues()->sync($attributeValue);
+                }
+            }
         }
     }
 }

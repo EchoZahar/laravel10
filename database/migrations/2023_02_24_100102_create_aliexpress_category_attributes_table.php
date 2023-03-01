@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('aliexpress_category_attributes', function (Blueprint $table) {
+        Schema::create('ali_category_attributes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('aliexpress_category_id')->constrained();
             $table->boolean('is_sku');
             $table->string('name');
             $table->integer('source_id');
@@ -27,7 +26,6 @@ return new class extends Migration
             $table->boolean('has_customized_pic');
             $table->boolean('has_customized_name');
             $table->json('units')->nullable();
-            $table->timestamps();
         });
     }
 
@@ -36,6 +34,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('aliexpress_category_attributes');
+        Schema::dropIfExists('ali_category_attributes');
     }
 };

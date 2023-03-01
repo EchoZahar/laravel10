@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('aliexpress_categories', function (Blueprint $table) {
+        Schema::create('ali_categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->integer('source_id');
@@ -25,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('aliexpress_categories');
+        Schema::dropIfExists('ali_categories');
     }
 };
